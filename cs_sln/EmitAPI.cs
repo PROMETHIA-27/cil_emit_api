@@ -148,6 +148,12 @@ public static class EmitAPI
     }
 
     [UnmanagedCallersOnly]
+    public static IntPtr GetModuleTypes(IntPtr module) 
+    {
+        return GetHandle(GetObject<ModuleDef>(module).Types);
+    }
+
+    [UnmanagedCallersOnly]
     public static void WriteModuleDef(IntPtr module, IntPtr path_str, int path_length)
     {
         string path = GetString(path_str, path_length);
@@ -157,6 +163,18 @@ public static class EmitAPI
 #endregion
 
 #region TypeDef
+    [UnmanagedCallersOnly]
+    public static IntPtr TypeDefCtor(IntPtr namespace_ptr, int namespace_length, IntPtr name_ptr, int name_length, IntPtr base_type)
+    {
+        string @namespace = GetString(namespace_ptr, namespace_length);
+        string name = GetString(name_ptr, name_length);
+        if (base_type != IntPtr.Zero) {
+            return GetHandle(new TypeDefUser(@namespace, name, GetObject<ITypeDefOrRef>(base_type)));
+        } else {
+            return GetHandle(new TypeDefUser(@namespace, name));
+        }
+    }
+
     [UnmanagedCallersOnly]
     public static IntPtr GetTypeDefMethods(IntPtr type)
     {
@@ -295,6 +313,13 @@ public static class EmitAPI
         CilBody bod = GetObject<CilBody>(cil_body);
         return GetHandle(bod.Instructions);
     }
+
+    [UnmanagedCallersOnly]
+    public static IntPtr GetCilBodyLocals(IntPtr cil_body) 
+    {
+        CilBody bod = GetObject<CilBody>(cil_body);
+        return GetHandle(bod.Variables);
+    }
 #endregion
 
 #region Instruction
@@ -302,7 +327,7 @@ public static class EmitAPI
     public static IntPtr InstructionCtor(ushort opcode, IntPtr parameter)
     {
         Code opc = (Code)opcode;
-        if (parameter != IntPtr.Zero) // 0'd GCHandles are invalid, so I can use it as optional
+        if (parameter != IntPtr.Zero) // zeroed GCHandles are invalid, so I can use it as optional
             return GetHandle(new Instruction(opc.ToOpCode(), GetObject<object>(parameter)));
         else 
             return GetHandle(new Instruction(opc.ToOpCode())); 

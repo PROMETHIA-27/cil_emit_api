@@ -96,6 +96,10 @@ impl ModuleDef {
         AssemblyRef::new((self.ctx().get_core_lib_assembly_ref)(self.handle()), self.ctx().clone())
     }
 
+    pub fn types(&mut self) -> IList<TypeDef> {
+        IList::new((self.ctx().get_module_types)(self.handle()), self.ctx().clone())
+    }
+
     pub fn write(&self, path: &str) {
         (self.ctx().write_module_def)(self.handle(), path.as_ptr() as isize, path.len() as i32)
     }
@@ -113,6 +117,10 @@ impl MemberRefParent for TypeRef {}
 impl TypeRef {
 
 }
+
+pub trait TypeDefOrRef : ObjHandleType {}
+impl TypeDefOrRef for TypeDef {}
+impl TypeDefOrRef for TypeRef {}
 
 obj_handle_type!(TypeSig);
 

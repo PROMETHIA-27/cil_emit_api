@@ -1,6 +1,9 @@
 use anyhow::Result;
 use netcorehost::{hostfxr::*, pdcstring::*, *};
-use std::sync::Arc;
+use std::{
+    fs::*,
+    sync::Arc
+};
 
 mod enums;
 mod newtypes;
@@ -87,9 +90,11 @@ csharp_sig_to_fn_ptr!{
         IntPtr GetGlobalType(IntPtr module),
         IntPtr GetCoreLibType(IntPtr module, int core_lib_type),
         IntPtr GetCoreLibAssemblyRef(IntPtr module),
+        IntPtr GetModuleTypes(IntPtr module),
         void WriteModuleDef(IntPtr module, IntPtr path_str, int path_length),
 
         // TypeDef
+        IntPtr TypeDefCtor(IntPtr namespace_ptr, int namespace_length, IntPtr name_ptr, int name_length, IntPtr base_type),
         IntPtr GetTypeDefMethods(IntPtr type),
 
         // TypeRef
@@ -133,13 +138,49 @@ csharp_sig_to_fn_ptr!{
     $
 }
 
+// TODO: Switch to release builds of CILEmitAPI
+// I don't *like* that I have to do this, but unfortunately I see this as the best way to access these resources after building them.
+// The alternative would be to somehow copy them after building to the actual project being built, which I was unable to find a good method for.
+// Also even better: tempfiles don't work, because hostfxr has no way to unload assemblies that are loaded, and only takes in filepaths, not memory,
+// so I have to emit files with this data and cannot free them without forking a new process at the end of this one just to kill the files.
+// I originally was going to use tempfiles but now I'm just going to spit these out in a folder next to the running .exe.
+static DNLIB_BYTES: &[u8] = include_bytes!("../cs_sln/bin/Debug/net6.0/publish/dnlib.dll");
+static DEPS_JSON_BYTES: &[u8] = include_bytes!("../cs_sln/bin/Debug/net6.0/publish/CILEmitApi.deps.json");
+static RUNTIME_CONFIG_BYTES: &[u8] = include_bytes!("../cs_sln/bin/Debug/net6.0/publish/CILEmitAPI.runtimeconfig.json");
+static CIL_EMIT_API_BYTES: &[u8] = include_bytes!("../cs_sln/bin/Debug/net6.0/publish/CILEmitAPI.dll");
+
 impl ClrAsmCtx {
     pub fn new() -> Result<Arc<ClrAsmCtx>> {
         let hostfxr = nethost::load_hostfxr().unwrap();
 
-        let dir = std::env::current_dir().unwrap();
-        let runtimeconfig_path = PdCString::try_from(dir.join("cs_sln/bin/Debug/net6.0/publish/CILEmitAPI.runtimeconfig.json").to_str().unwrap()).unwrap();
-        let api_dll_path = PdCString::try_from(dir.join("cs_sln/bin/Debug/net6.0/publish/CILEmitAPI.dll").to_str().unwrap()).unwrap();
+        let exe = std::env::current_exe().expect("Failed to get current exe!");
+        let dir = exe.parent().expect("Failed to get current exe parent!").join("managed");
+        let _ = std::fs::create_dir(dir.clone());
+        if !std::path::Path::exists(&dir) { panic!("Failed to create or find managed folder." ) }
+
+        let dnlib_path = dir.join("dnlib.dll");
+        let deps_path = dir.join("CILEmitAPI.deps.json");
+        let runtime_config_path = dir.join("CILEmitAPI.runtimeconfig.json");
+        let cil_emit_api_path = dir.join("CILEmitAPI.dll");
+
+        if !dnlib_path.exists() || !deps_path.exists() || !runtime_config_path.exists() || !cil_emit_api_path.exists() {
+            let mut opts = File::options();
+            opts.create(true).write(true).read(true);
+        
+            let mut dnlib_dll = opts.open(dnlib_path).expect("Failed to create dnlib.dll");
+            let mut deps_json = opts.open(deps_path).expect("Failed to create CILEmitAPI.deps.json");
+            let mut runtime_config = opts.open(runtime_config_path.clone()).expect("Failed to create CILEmitAPI.runtimeconfig.json");
+            let mut cil_emit_api_dll = opts.open(cil_emit_api_path.clone()).expect("Failed to create CILEmitAPI.dll");
+        
+            use std::io::Write;
+            dnlib_dll.write_all(DNLIB_BYTES).expect("Failed to write dnlib.dll");
+            deps_json.write_all(DEPS_JSON_BYTES).expect("Failed to write CILEmitAPI.deps.json");
+            runtime_config.write_all(RUNTIME_CONFIG_BYTES).expect("Failed to write CILEmitAPI.runtimeconfig.json");
+            cil_emit_api_dll.write_all(CIL_EMIT_API_BYTES).expect("Failed to write CILEmitAPI.dll");
+        }
+
+        let runtimeconfig_path = PdCString::try_from(runtime_config_path.to_str().unwrap()).unwrap();
+        let api_dll_path = PdCString::try_from(cil_emit_api_path.to_str().unwrap()).unwrap();
     
         let context = hostfxr.initialize_for_runtime_config(runtimeconfig_path).unwrap();
         let loader = context.get_delegate_loader_for_assembly(api_dll_path).unwrap();
@@ -153,6 +194,12 @@ impl ClrAsmCtx {
 
     pub fn module_def(self: &Arc<Self>, name: &str) -> ModuleDef {
         ModuleDef::new((self.module_def_ctor)(name.as_ptr() as isize, name.len() as i32), self.clone())
+    }
+
+    pub fn type_def<T: TypeDefOrRef>(self: &Arc<Self>, namespace: Option<&str>, name: &str, base_ty: Option<&T>) -> TypeDef {
+        let namespace = namespace.unwrap_or("");
+        let base_handle = base_ty.map(|b| b.handle()).unwrap_or(0);
+        TypeDef::new((self.type_def_ctor)(namespace.as_ptr() as isize, namespace.len() as i32, name.as_ptr() as isize, name.len() as i32, base_handle), self.clone())
     }
 
     pub fn type_ref<S: ResolutionScope>(self: &Arc<Self>, module: &ModuleDef, namespace: &str, name: &str, scope: &S) -> TypeRef {
