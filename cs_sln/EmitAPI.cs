@@ -181,6 +181,13 @@ public static class EmitAPI
         TypeDef ty = GetObject<TypeDef>(type);
         return GetHandle(ty.Methods);
     }
+
+    [UnmanagedCallersOnly]
+    public static IntPtr GetTypeDefSig(IntPtr type)
+    {
+        TypeDef ty = GetObject<TypeDef>(type);
+        return GetHandle(ty.ToTypeSig());
+    }
 #endregion
 
 #region TypeRef

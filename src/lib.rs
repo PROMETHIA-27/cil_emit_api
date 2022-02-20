@@ -97,6 +97,7 @@ csharp_sig_to_fn_ptr!{
         // TypeDef
         IntPtr TypeDefCtor(IntPtr namespace_ptr, int namespace_length, IntPtr name_ptr, int name_length, IntPtr base_type),
         IntPtr GetTypeDefMethods(IntPtr type),
+        IntPtr GetTypeDefSig(IntPtr type),
 
         // TypeRef
         IntPtr TypeRefCtor(IntPtr module, IntPtr namespace_ptr, int namespace_length, IntPtr name_ptr, int name_length, IntPtr resolution_scope),

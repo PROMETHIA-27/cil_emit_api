@@ -110,6 +110,10 @@ impl TypeDef {
     pub fn methods(&mut self) -> IList<MethodDef> {
         IList::new((self.ctx().get_type_def_methods)(self.handle()), self.ctx().clone())
     }
+
+    pub fn sig(&self) -> TypeSig {
+        TypeSig::new((self.ctx().get_type_def_sig)(self.handle()), self.ctx().clone())
+    }
 }
 
 obj_handle_type!(TypeRef);
