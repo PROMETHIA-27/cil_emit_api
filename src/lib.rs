@@ -174,19 +174,19 @@ impl ClrAsmCtx {
             use blake2::{Blake2b512, Digest};
 
             let dnlib_bytes_hash = Blake2b512::digest(DNLIB_BYTES);
-            let deps_json_bytes_hash = Blake2b512::digest(DNLIB_BYTES);
-            let runtime_config_bytes_hash = Blake2b512::digest(DNLIB_BYTES);
-            let cil_emit_api_bytes_hash = Blake2b512::digest(DNLIB_BYTES);
+            let deps_json_bytes_hash = Blake2b512::digest(DEPS_JSON_BYTES);
+            let runtime_config_bytes_hash = Blake2b512::digest(RUNTIME_CONFIG_BYTES);
+            let cil_emit_api_bytes_hash = Blake2b512::digest(CIL_EMIT_API_BYTES);
 
             let dnlib_file_hash = Blake2b512::digest(&std::fs::read(dnlib_path.clone()).expect("Failed to read dnlib.dll")[..]);
             let deps_json_file_hash = Blake2b512::digest(&std::fs::read(deps_path.clone()).expect("Failed to read CILEmitAPI.deps.json")[..]);
             let runtime_config_file_hash = Blake2b512::digest(&std::fs::read(runtime_config_path.clone()).expect("Failed to read CILEmitAPI.runtimeconfig.json")[..]);
             let cil_emit_api_file_hash = Blake2b512::digest(&std::fs::read(cil_emit_api_path.clone()).expect("Failed to read CILEmitAPI.dll")[..]);
 
-            dnlib_bytes_hash == dnlib_file_hash && 
-            deps_json_bytes_hash == deps_json_file_hash && 
-            runtime_config_bytes_hash == runtime_config_file_hash && 
-            cil_emit_api_bytes_hash == cil_emit_api_file_hash
+            dnlib_bytes_hash != dnlib_file_hash ||
+            deps_json_bytes_hash != deps_json_file_hash ||
+            runtime_config_bytes_hash != runtime_config_file_hash ||
+            cil_emit_api_bytes_hash != cil_emit_api_file_hash
         };
 
         if missing_files || files_changed {
