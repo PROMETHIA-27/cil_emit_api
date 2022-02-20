@@ -122,6 +122,10 @@ csharp_sig_to_fn_ptr!{
         // CilBody
         IntPtr CilBodyCtor(),
         IntPtr GetCilBodyInstructions(IntPtr cil_body),
+        IntPtr GetCilBodyLocals(IntPtr cil_body),
+
+        // Local
+        IntPtr LocalCtor(IntPtr type_signature),
 
         // Instruction
         IntPtr InstructionCtor(ushort opcode, IntPtr parameter),
@@ -241,6 +245,10 @@ impl ClrAsmCtx {
 
     pub fn cil_body(self: &Arc<Self>) -> CilBody {
         CilBody::new((self.cil_body_ctor)(), self.clone())
+    }
+
+    pub fn local(self: &Arc<Self>, type_signature: &TypeSig) -> Local {
+        Local::new((self.local_ctor)(type_signature.handle()), self.clone())
     }
 
     pub fn instruction<T: ObjHandleType>(self: &Arc<Self>, code: OpCode, operand: &T) -> Instruction {

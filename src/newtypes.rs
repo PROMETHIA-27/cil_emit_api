@@ -37,7 +37,7 @@ macro_rules! obj_handle_type {
         #[allow(unused_parens)]
         pub struct $name<$($gen_params $(: $traits)?)+>(pub(crate) ObjHandle, std::marker::PhantomData<($($gen_params)+)>);
         impl<$($gen_params $(: $traits)?)+> $name<$($gen_params)+> {
-            pub fn new(handle: isize, ctx: Arc<crate::ClrAsmCtx>) -> Self {
+            fn new(handle: isize, ctx: Arc<crate::ClrAsmCtx>) -> Self {
                 $name(ObjHandle { handle, ctx }, Default::default())
             }
         }
@@ -163,7 +163,13 @@ impl CilBody {
     pub fn instructions(&mut self) -> IList<Instruction> {
         IList::new((self.ctx().get_cil_body_instructions)(self.handle()), self.ctx().clone())
     }
+
+    pub fn locals(&mut self) -> IList<Local> {
+        IList::new((self.ctx().get_cil_body_locals)(self.handle()), self.ctx().clone())
+    }
 }
+
+obj_handle_type!(Local);
 
 obj_handle_type!(Instruction);
 

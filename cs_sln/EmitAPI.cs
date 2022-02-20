@@ -322,6 +322,15 @@ public static class EmitAPI
     }
 #endregion
 
+#region Local
+    [UnmanagedCallersOnly]
+    public static IntPtr LocalCtor(IntPtr type_signature)
+    {
+        TypeSig sig = GetObject<TypeSig>(type_signature);
+        return GetHandle(new Local(sig));
+    }
+#endregion
+
 #region Instruction
     [UnmanagedCallersOnly]
     public static IntPtr InstructionCtor(ushort opcode, IntPtr parameter)
