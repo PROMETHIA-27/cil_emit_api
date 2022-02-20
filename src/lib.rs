@@ -1,4 +1,5 @@
 use anyhow::Result;
+use blake2::Blake2b;
 use netcorehost::{hostfxr::*, pdcstring::*, *};
 use std::{
     fs::*,
@@ -167,9 +168,31 @@ impl ClrAsmCtx {
         let runtime_config_path = dir.join("CILEmitAPI.runtimeconfig.json");
         let cil_emit_api_path = dir.join("CILEmitAPI.dll");
 
-        if !dnlib_path.exists() || !deps_path.exists() || !runtime_config_path.exists() || !cil_emit_api_path.exists() {
+        let missing_files = !dnlib_path.exists() || !deps_path.exists() || !runtime_config_path.exists() || !cil_emit_api_path.exists();
+        let files_changed = !missing_files && {
+            use blake2::{Blake2b512, Digest};
+
+            let dnlib_bytes_hash = Blake2b512::digest(DNLIB_BYTES);
+            let deps_json_bytes_hash = Blake2b512::digest(DNLIB_BYTES);
+            let runtime_config_bytes_hash = Blake2b512::digest(DNLIB_BYTES);
+            let cil_emit_api_bytes_hash = Blake2b512::digest(DNLIB_BYTES);
+
+            let dnlib_file_hash = Blake2b512::digest(&std::fs::read(dnlib_path.clone()).expect("Failed to read dnlib.dll")[..]);
+            let deps_json_file_hash = Blake2b512::digest(&std::fs::read(deps_path.clone()).expect("Failed to read CILEmitAPI.deps.json")[..]);
+            let runtime_config_file_hash = Blake2b512::digest(&std::fs::read(runtime_config_path.clone()).expect("Failed to read CILEmitAPI.runtimeconfig.json")[..]);
+            let cil_emit_api_file_hash = Blake2b512::digest(&std::fs::read(cil_emit_api_path.clone()).expect("Failed to read CILEmitAPI.dll")[..]);
+
+            dnlib_bytes_hash == dnlib_file_hash && 
+            deps_json_bytes_hash == deps_json_file_hash && 
+            runtime_config_bytes_hash == runtime_config_file_hash && 
+            cil_emit_api_bytes_hash == cil_emit_api_file_hash
+        };
+
+        if missing_files || files_changed {
+            println!("Emitting files");
+
             let mut opts = File::options();
-            opts.create(true).write(true).read(true);
+            opts.create(true).write(true);
         
             let mut dnlib_dll = opts.open(dnlib_path).expect("Failed to create dnlib.dll");
             let mut deps_json = opts.open(deps_path).expect("Failed to create CILEmitAPI.deps.json");
